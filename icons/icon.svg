@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512"
+     role="img" aria-label="Scout">
+  <title>Scout</title>
+  <!--
+    A map pin inside an orbit: the two halves of what the app measures, from the
+    street corner to the far side of the solar system. The orbit passes behind
+    the pin at the top and in front of it at the bottom.
+
+    This is the "any" icon: art at 1.12 so it fills the square. icon-maskable.svg
+    is the same art at 1.0, which keeps it inside the 80% safe circle that
+    Android's adaptive masks can crop to.
+  -->
+  <defs>
+    <linearGradient id="sky" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="120" y2="512">
+      <stop offset="0" stop-color="#7C63C6"/>
+      <stop offset=".55" stop-color="#5B41A0"/>
+      <stop offset="1" stop-color="#33235F"/>
+    </linearGradient>
+    <linearGradient id="pin" gradientUnits="userSpaceOnUse" x1="180" y1="130" x2="330" y2="400">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#DFD0FF"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" fill="url(#sky)"/>
+
+  <g transform="translate(256 256) scale(1.12) translate(-256 -256)">
+    <!-- orbit, far half -->
+    <path d="M 430.3 185.6 A 188 64 -22 0 0 81.7 326.4" fill="none"
+          stroke="#D0BCFF" stroke-opacity=".5" stroke-width="15" stroke-linecap="round"/>
+
+    <!-- pin -->
+    <path d="M 256 392 L 332.4 269.6 A 90 90 0 1 0 179.6 269.6 Z" fill="url(#pin)"/>
+    <circle cx="256" cy="222" r="33" fill="url(#sky)"/>
+
+    <!-- orbit, near half, crossing in front -->
+    <path d="M 430.3 185.6 A 188 64 -22 0 1 81.7 326.4" fill="none"
+          stroke="#EADDFF" stroke-width="15" stroke-linecap="round"/>
+    <circle cx="371" cy="267.4" r="19" fill="#FFD8E4"/>
+  </g>
+</svg>

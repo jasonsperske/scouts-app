@@ -163,12 +163,56 @@ finish rather than being cancelled halfway through publishing.
   branch** → `main` / `/ (root)`); the included `.nojekyll` keeps Jekyll's hands off
   the assets. The Actions workflow is the better route, since it runs the checks.
 
+## Adding it to a phone's home screen
+
+Open the site in the phone's browser, then:
+
+- **iOS / iPadOS** — Safari → **Share** → **Add to Home Screen**. iOS uses
+  `icons/apple-touch-icon.png` and the `apple-mobile-web-app-title` tag, so the icon
+  arrives with square corners already trimmed and the label reads "Scout".
+- **Android** — Chrome → **⋮** → **Add to Home screen** (offered as *Install app* on
+  some builds). Chrome reads `site.webmanifest` and picks the maskable icon, so the
+  launcher can crop it to whatever shape the device uses — circle, squircle, rounded
+  square — without clipping the artwork.
+
+Either way it opens without browser chrome (`"display": "standalone"`), which is why
+it feels like an app rather than a bookmark. Everything still runs client-side; there
+is no service worker yet, so it needs a connection on first load and for place search.
+
+### The icon
+
+A map pin inside an orbit — the two halves of what the app measures.
+
+| File | Used by |
+|---|---|
+| `icons/icon.svg` | the vector master, and the browser tab on modern browsers |
+| `icons/icon-maskable.svg` | same art, scaled to sit inside Android's 80% safe circle |
+| `icons/apple-touch-icon.png` | 180×180, opaque, iOS home screen |
+| `icons/icon-192.png`, `icons/icon-512.png` | manifest, `purpose: any` |
+| `icons/icon-maskable-192.png`, `icons/icon-maskable-512.png` | manifest, `purpose: maskable` |
+| `icons/favicon-32.png` | fallback tab icon |
+
+To change the artwork, edit **`icons/icon.svg`**, mirror the change in
+`icons/icon-maskable.svg` (identical except for the `scale()` on the art group), then
+regenerate every PNG:
+
+```sh
+./icons/build.sh          # needs Inkscape and ImageMagick
+```
+
+Two rules the design has to keep: the background must reach all four edges, because
+iOS composites transparency onto black and Android crops the corners; and everything
+that matters must stay inside the middle 80% of the maskable version, because that is
+all a circular launcher mask will show.
+
 ## Layout
 
 ```
 .github/workflows/
   deploy.yml        checks the sources, then publishes to GitHub Pages
 index.html          markup, sheets and dialogs
+site.webmanifest    name, colours and icons for installing to a home screen
+icons/              icon sources, generated PNGs, and build.sh to regenerate them
 css/styles.css      Material 3 tokens and components
 js/app.js           state, rendering, the live clock, wiring
 js/db.js            IndexedDB store + settings
