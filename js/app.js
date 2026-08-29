@@ -21,7 +21,8 @@ const el = {
   unitBar: $('unitBar'), unitBtn: $('unitBtn'), unitLabel: $('unitLabel'),
   unitIcon: $('unitIcon'), unitHint: $('unitHint'),
   unitSheet: $('unitSheet'), unitList: $('unitList'),
-  skySheet: $('skySheet'), skyBody: $('skyBody'), skyTitle: $('skySheetTitle'),
+  detailSheet: $('detailSheet'), detailContent: $('detailContent'),
+  detailTitle: $('detailTitle'), detailSubtitle: $('detailSubtitle'),
   nameDialog: $('nameDialog'), nameForm: $('nameForm'), nameInput: $('nameInput'),
   nameDialogTitle: $('nameDialogTitle'), nameSubmit: $('nameSubmit'), nameSupport: $('nameSupport'),
   confirmDialog: $('confirmDialog'), confirmText: $('confirmText'), confirmOk: $('confirmOk'),
@@ -117,6 +118,7 @@ function orderedIds() {
 /* ---------------------------------------------------------------- format */
 
 function formatDuration(seconds) {
+  if (seconds < 10) return `${Math.max(0, seconds).toFixed(1)}s`;
   const s = Math.max(0, Math.round(seconds));
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
   if (h) return `${h}h ${String(m).padStart(2, '0')}m`;
@@ -665,64 +667,344 @@ function unitOption({ icon, title, sub, selected, onSelect }) {
   return li;
 }
 
-/* ---------------------------------------------------------------- sky detail */
+/* ------------------------------------------------------------- detail sheet */
 
-let skyTimer = null;
+let detailTimer = null;
+let detailLive = [];
 
-function openSkySheet(place) {
-  el.skyTitle.textContent = place.name;
-  el.skySheet.showModal();
-  paintSkySheet(place);
-  clearInterval(skyTimer);
-  skyTimer = setInterval(() => paintSkySheet(place), 200);
-  el.skySheet.addEventListener('close', () => clearInterval(skyTimer), { once: true });
+/** Tapping any row opens this: what the number is, and how much to trust it. */
+function openDetailSheet(place) {
+  el.detailTitle.textContent = place.name;
+  el.detailSubtitle.textContent = place.detail
+    || (isSky(place) ? BODIES[place.body].name : formatCoords(place));
+
+  detailLive = [];
+  const budget = errorBudget(place);
+  el.detailContent.replaceChildren(
+    sectionTitle('Right now'),
+    rowGroup(measurementRows(place)),
+    sectionTitle('How wrong could this be?'),
+    rowGroup(errorRows(place, budget)),
+    infoBox(budget.reasons),
+  );
+
+  el.detailSheet.showModal();
+  clearInterval(detailTimer);
+  detailTimer = setInterval(() => {
+    state.now = new Date();
+    for (const { valueEl, compute } of detailLive) valueEl.textContent = compute();
+  }, 250);
+  el.detailSheet.addEventListener('close', () => {
+    clearInterval(detailTimer);
+    detailLive = [];
+  }, { once: true });
 }
 
-function paintSkySheet(place) {
-  if (!state.origin) return;
-  const now = new Date();
-  state.now = now;
-  const view = observe(place, site(), now);
-  const body = BODIES[place.body];
-  const culmination = culminationFor(place);
-  const sub = subEarthPoint(place.body, site(), now);
-  const mode = currentMode();
-  const shown = formatDistance(view.distanceMetres, mode);
-  const lightSeconds = view.distanceKm / 299792.458;
+function sectionTitle(text) {
+  const heading = document.createElement('h3');
+  heading.className = 'detail-section';
+  heading.textContent = text;
+  return heading;
+}
 
-  const rows = [
-    ['Distance', `${shown.value} ${shown.suffix}`.trim()],
-    ['Changing at', `${formatSigned(view.rangeRateKmS, 3, ' km/s')} (${view.rangeRateKmS >= 0 ? 'receding' : 'closing'})`],
-    ['Light delay', formatDuration(lightSeconds) + (lightSeconds < 60 ? '' : ` (${lightSeconds.toFixed(0)} s)`)],
-    ['In your sky', `${formatSigned(view.altitude, 1, '°')} altitude · ${view.azimuth.toFixed(1)}° azimuth`],
-  ];
-  if (culmination) {
-    const remaining = (culmination.at - now) / 1000;
-    rows.push([
-      culmination.type === 'zenith' ? 'Zenith crossing' : 'Nadir crossing',
-      `in ${formatDuration(remaining)} · ${culmination.at.toLocaleTimeString()}`,
-    ]);
-  }
-  if (sub) {
-    rows.push(['You are over', `${sub.latDeg.toFixed(2)}° ${sub.latDeg >= 0 ? 'N' : 'S'}, ${sub.lonDeg.toFixed(2)}°E of ${body.name}`]);
-  }
-  if (place.feature) {
-    rows.push(['Surface point', `${place.feature.lat.toFixed(2)}°, ${place.feature.lon.toFixed(2)}°E on a sphere of r = ${body.radiusKm.toLocaleString()} km`]);
-  }
-  rows.push(['Model error', `±${body.accuracyKm.toLocaleString()} km${place.feature ? ` · ±${body.surfaceKm} km surface placement` : ''}`]);
-
-  el.skyBody.replaceChildren(...rows.map(([label, value]) => {
+function rowGroup(rows) {
+  const wrap = document.createElement('div');
+  wrap.className = 'detail-rows';
+  for (const { label, value, live } of rows) {
     const row = document.createElement('div');
-    row.className = 'sky-row';
-    const l = document.createElement('span');
-    l.className = 'sky-row__label';
-    l.textContent = label;
-    const v = document.createElement('span');
-    v.className = 'sky-row__value';
-    v.textContent = value;
-    row.append(l, v);
-    return row;
-  }));
+    row.className = 'detail-row';
+    const labelEl = document.createElement('span');
+    labelEl.className = 'detail-row__label';
+    labelEl.textContent = label;
+    const valueEl = document.createElement('span');
+    valueEl.className = 'detail-row__value';
+    valueEl.textContent = live ? live() : value;
+    if (live) detailLive.push({ valueEl, compute: live });
+    row.append(labelEl, valueEl);
+    wrap.append(row);
+  }
+  return wrap;
+}
+
+function infoBox(reasons) {
+  const box = document.createElement('div');
+  box.className = 'info-box';
+  for (const { icon, title, text } of reasons) {
+    const item = document.createElement('div');
+    item.className = 'info-item';
+    const glyph = document.createElement('span');
+    glyph.className = 'ms';
+    glyph.textContent = icon;
+    const body = document.createElement('p');
+    const strong = document.createElement('strong');
+    strong.textContent = title;
+    body.append(strong, document.createTextNode(` — ${text}`));
+    item.append(glyph, body);
+    box.append(item);
+  }
+  return box;
+}
+
+const km = value => value >= 1 ? `${Math.round(value).toLocaleString()} km`
+  : value >= 0.001 ? `${(value * 1000).toFixed(0)} m`
+  : `${(value * 1e6).toFixed(0)} mm`;
+
+function showDistance(place) {
+  const metres = placeMetres(place);
+  if (!isFinite(metres)) return '—';
+  const formatted = formatDistance(metres, currentMode());
+  return `${formatted.value} ${formatted.suffix}`.trim();
+}
+
+/** Initial great-circle bearing from the observer, as a compass point. */
+function bearingTo(place) {
+  const toRad = Math.PI / 180;
+  const dLon = (place.lon - state.origin.lon) * toRad;
+  const lat1 = state.origin.lat * toRad, lat2 = place.lat * toRad;
+  const y = Math.sin(dLon) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+  const deg = (Math.atan2(y, x) / toRad + 360) % 360;
+  const points = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+  return `${points[Math.round(deg / 22.5) % 16]} · ${deg.toFixed(0)}°`;
+}
+
+function measurementRows(place) {
+  const located = fn => () => (state.origin ? fn() : '—');
+
+  if (!isSky(place)) {
+    return [
+      { label: 'Distance', live: () => showDistance(place) },
+      { label: 'Coordinates', value: `${place.lat.toFixed(5)}, ${place.lon.toFixed(5)}` },
+      { label: 'Direction', live: located(() => bearingTo(place)) },
+      { label: 'Measured as', value: 'Great-circle arc over the surface' },
+    ];
+  }
+
+  const body = BODIES[place.body];
+  const rows = [
+    { label: 'Distance', live: () => showDistance(place) },
+    { label: 'Changing at', live: located(() => {
+      const rate = observe(place, site(), state.now).rangeRateKmS;
+      return `${formatSigned(rate, 3, ' km/s')} · ${rate >= 0 ? 'receding' : 'closing'}`;
+    }) },
+    { label: 'Light delay', live: located(() => formatDuration(placeMetres(place) / 1000 / 299792.458)) },
+    { label: 'In your sky', live: located(() => {
+      const view = look(place, site(), state.now);
+      return `${formatSigned(view.altitude, 1, '°')} altitude · ${view.azimuth.toFixed(1)}° azimuth`;
+    }) },
+    { label: 'Next crossing', live: located(() => {
+      const culmination = culminationFor(place);
+      if (!culmination) return '—';
+      return `${culmination.type} in ${formatDuration((culmination.at - state.now) / 1000)}`
+        + ` · ${culmination.at.toLocaleTimeString()}`;
+    }) },
+    { label: 'You are over', live: located(() => {
+      const sub = subEarthPoint(place.body, site(), state.now);
+      if (!sub) return '—';
+      return `${Math.abs(sub.latDeg).toFixed(2)}° ${sub.latDeg >= 0 ? 'N' : 'S'},`
+        + ` ${sub.lonDeg.toFixed(2)}° E of ${body.name}`;
+    }) },
+  ];
+  if (place.feature) {
+    rows.push({
+      label: 'Surface point',
+      value: `${place.feature.lat.toFixed(2)}°, ${place.feature.lon.toFixed(2)}° E`
+        + ` · r = ${Math.round(body.radiusKm).toLocaleString()} km`,
+    });
+  }
+  return rows;
+}
+
+/**
+ * What could be wrong, in metres, and why — the honest counterweight to a
+ * readout that will happily print millimetres.
+ */
+function errorBudget(place) {
+  const reasons = [];
+  let metres = 0;
+
+  if (isSky(place)) {
+    const body = BODIES[place.body];
+    metres += body.accuracyKm * 1000;
+    const source = place.body === 'moon'
+      ? 'a truncated ELP-2000 lunar series (Meeus, chapter 47)'
+      : place.body === 'sun'
+        ? "Earth's orbit, from JPL's approximate Keplerian elements for 1800–2050"
+        : "JPL's approximate Keplerian elements for the planets, valid 1800–2050";
+    reasons.push({
+      icon: 'travel_explore',
+      title: `Where ${body.name} is`,
+      text: `±${km(body.accuracyKm)}. The position comes from ${source} — compact enough to run `
+        + `in your browser, but not a full DE441 ephemeris. That figure is the worst error `
+        + `measured against JPL Horizons across 2026–2029, not a guess.`,
+    });
+
+    if (place.feature) {
+      const flattening = (body.flatteningKm || 0) * Math.sin(place.feature.lat * Math.PI / 180) ** 2;
+      metres += (body.surfaceKm + flattening) * 1000;
+      reasons.push({
+        icon: 'terrain',
+        title: 'Where the feature is',
+        text: `±${km(body.surfaceKm)} for the IAU rotation model that swings this point towards `
+          + `and away from you`
+          + (flattening > 1 ? `, plus ${km(flattening)} because the body is treated as a sphere of `
+            + `its equatorial radius when it is really ${km(body.flatteningKm)} wider than it is tall` : '')
+          + `. Terrain height above the reference sphere is ignored.`,
+      });
+    }
+
+    if (state.origin) {
+      const view = observe(place, site(), state.now);
+      const perSecond = Math.abs(view.rangeRateKmS);
+      reasons.push({
+        icon: 'schedule',
+        title: 'Your clock',
+        text: `This distance moves ${km(perSecond)} every second, so a device clock ten seconds `
+          + `out puts it ${km(perSecond * 10)} wrong on its own. Nothing here can detect that.`,
+      });
+      reasons.push({
+        icon: 'visibility',
+        title: 'Geometry, not eyesight',
+        text: `This is where ${place.name} is at this instant, not where you would see it: its `
+          + `light left ${formatDuration(view.distanceKm / 299792.458)} ago. No light-time, `
+          + `aberration or atmospheric refraction correction is applied.`,
+      });
+    }
+
+    reasons.push({
+      icon: 'tune',
+      title: 'Deliberately left out',
+      text: 'Nutation (worth under 0.6 km of observer position) and the UT1−UTC offset (under '
+        + '0.9 s, so under 0.5 km of Earth rotation). Both are far below the model error above.',
+    });
+  } else {
+    const distance = placeMetres(place);
+    const sphere = isFinite(distance) ? distance * 0.005 : 0;
+    metres += sphere;
+    reasons.push({
+      icon: 'public',
+      title: 'The Earth is not a sphere',
+      text: 'Distances to places on Earth are great-circle arcs on a sphere of mean radius. The '
+        + 'true distance across the WGS84 ellipsoid differs by up to about 0.5%'
+        + (isFinite(distance) ? ` — roughly ${km(sphere / 1000)} at this range.` : '.'),
+    });
+    reasons.push({
+      icon: 'place',
+      title: 'Where the place is',
+      text: 'A saved place is a single point. Search results mark a building entrance or an '
+        + 'administrative centroid, and a park, a city or a mountain can be kilometres across.',
+    });
+    reasons.push({
+      icon: 'landscape',
+      title: 'Flat as drawn',
+      text: 'Elevation is ignored — this is measured at sea level. It is also not travel '
+        + 'distance: no roads, no flights, no detours.',
+    });
+  }
+
+  if (state.origin && state.origin.source === 'gps') {
+    const fix = state.origin.accuracy || 10;
+    metres += fix;
+    reasons.push({
+      icon: 'my_location',
+      title: 'Where you are',
+      text: `Your device put itself within about ±${Math.round(fix)} m. Indoors, in a city, or on `
+        + `a laptop using Wi-Fi positioning, that figure is often optimistic.`,
+    });
+  } else if (state.origin) {
+    reasons.push({
+      icon: 'my_location',
+      title: 'Where you are',
+      text: `You are measuring from ${state.origin.label || 'a point you picked'} rather than a `
+        + `satellite fix, so every distance here inherits that choice.`,
+    });
+  }
+
+  const distance = placeMetres(place);
+  if (isFinite(distance) && metres > 0 && distance > metres) {
+    const digits = Math.max(1, Math.floor(Math.log10(distance / metres)) + 1);
+    reasons.push({
+      icon: 'password',
+      title: 'Digits are not accuracy',
+      text: `About the first ${digits} digit${digits === 1 ? '' : 's'} of this distance carry `
+        + `information. The rest are there because watching them move is fun.`,
+    });
+  }
+
+  return { metres, reasons };
+}
+
+/** Round to a couple of significant figures — an error bar quoted to the metre
+    is its own kind of dishonesty. */
+function roundSignificant(value, digits = 2) {
+  if (!isFinite(value) || value === 0) return value;
+  const factor = 10 ** (digits - 1 - Math.floor(Math.log10(Math.abs(value))));
+  return Math.round(value * factor) / factor;
+}
+
+/**
+ * Saved places that make readable yardsticks for the error: the one closest to
+ * a 1× ratio, plus the extremes either side of it, so you get both
+ * "875 Disneylands" and "a tenth of a Moon".
+ */
+function comparisonPlaces(place, errorMetres) {
+  const mode = currentMode();
+  const candidates = state.places
+    .filter(other => other.id !== place.id)
+    .map(other => ({ id: other.id, name: other.name, metres: placeMetres(other) }))
+    .filter(candidate => isFinite(candidate.metres) && candidate.metres > 1)
+    .filter(candidate => {
+      const ratio = errorMetres / candidate.metres;
+      return ratio >= 1e-3 && ratio <= 1e6;       // beyond this nobody can picture it
+    })
+    .sort((a, b) => a.metres - b.metres);
+  if (!candidates.length) return [];
+
+  const chosen = [];
+  const take = candidate => {
+    if (candidate && !chosen.some(c => c.id === candidate.id)) chosen.push(candidate);
+  };
+
+  if (mode.kind === 'place') take(candidates.find(candidate => candidate.id === mode.placeId));
+  take([...candidates].sort((a, b) =>
+    Math.abs(Math.log10(errorMetres / a.metres)) - Math.abs(Math.log10(errorMetres / b.metres)))[0]);
+  take(candidates[0]);                            // nearest: the biggest multiple
+  take(candidates[candidates.length - 1]);        // farthest: the smallest fraction
+
+  return chosen.slice(0, 3).sort((a, b) => b.metres - a.metres);
+}
+
+function errorRows(place, budget) {
+  const error = roundSignificant(budget.metres);
+  const human = formatDistance(error, { kind: 'human' });
+  const rows = [{ label: 'Could be out by', value: `± ${human.value} ${human.suffix}` }];
+
+  const mode = currentMode();
+  if (mode.kind === 'unit') {
+    const formatted = formatDistance(error, mode);
+    rows.push({
+      label: `In ${UNIT_BY_ID[mode.unitId].name.toLowerCase()}`,
+      value: `± ${formatted.value} ${formatted.suffix}`,
+    });
+  }
+
+  const distance = placeMetres(place);
+  if (isFinite(distance) && distance > 0) {
+    const share = error / distance * 100;
+    rows.push({
+      label: 'Share of the distance',
+      value: share < 0.001 ? `${share.toExponential(1)}%` : `${share.toFixed(share < 1 ? 3 : 1)}%`,
+    });
+  }
+
+  for (const reference of comparisonPlaces(place, error)) {
+    const formatted = formatDistance(error, {
+      kind: 'place', name: reference.name, metres: reference.metres,
+    });
+    rows.push({ label: `In ${reference.name} units`, value: `± ${formatted.value}` });
+  }
+
+  return rows;
 }
 
 /* ---------------------------------------------------------------- row menu */
@@ -735,9 +1017,9 @@ function openMenu(anchor, place) {
   const items = [
     { icon: 'straighten', label: isRef ? 'Stop using as unit' : 'Use as unit',
       run: () => isRef ? setMode({ unitKind: 'human', refPlaceId: null }) : useAsUnit(place) },
-    isSky(place)
-      ? { icon: 'travel_explore', label: 'Sky details', run: () => openSkySheet(place) }
-      : { icon: 'person_pin_circle', label: 'Measure from here', run: () => setManualOrigin(place) },
+    { icon: 'info', label: 'Details & accuracy', run: () => openDetailSheet(place) },
+    !isSky(place) && { icon: 'person_pin_circle', label: 'Measure from here',
+      run: () => setManualOrigin(place) },
     { icon: 'edit', label: 'Rename', run: () => renamePlace(place) },
     !isSky(place) && { icon: 'content_copy', label: 'Copy coordinates', run: () => copyCoords(place) },
     !isSky(place) && { icon: 'map', label: 'Open in maps', run: () => openInMaps(place) },
@@ -897,7 +1179,7 @@ function wire() {
     const row = event.target.closest('.place');
     if (!row || event.target.closest('.place__handle')) return;
     const place = state.places.find(p => p.id === row.dataset.id);
-    if (place && isSky(place) && state.origin) openSkySheet(place);
+    if (place) openDetailSheet(place);
   });
 
   document.addEventListener('click', event => {
@@ -911,7 +1193,7 @@ function wire() {
     button.addEventListener('click', () => button.closest('dialog').close());
   });
 
-  for (const sheet of [el.unitSheet, el.skySheet]) {
+  for (const sheet of [el.unitSheet, el.detailSheet]) {
     sheet.addEventListener('click', event => { if (event.target === sheet) sheet.close(); });
   }
 

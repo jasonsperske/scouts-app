@@ -290,20 +290,37 @@ main {
 
 .place--sky .place__avatar { background: var(--md-tertiary-container); color: var(--md-on-tertiary-container); }
 .place--sky.place--reference .place__avatar { background: var(--md-primary); color: var(--md-on-primary); }
-.place--sky { cursor: pointer; }
+.place { cursor: pointer; }
+.place__handle, .place [data-menu] { cursor: grab; }
+.place [data-menu] { cursor: pointer; }
 .place__distance--long { font-size: 12px; letter-spacing: -0.2px; }
 .place__distance--long small { font-size: 10px; }
 
-.sheet__title--strong { font-size: 22px; font-weight: 400; color: var(--md-on-surface); margin-bottom: 12px; }
+.sheet__title--strong { font-size: 22px; font-weight: 400; color: var(--md-on-surface); margin-bottom: 2px; }
+.sheet__subtitle { margin: 0 24px 4px; font-size: 13px; color: var(--md-on-surface-variant); }
 .sheet__actions { display: flex; justify-content: flex-end; padding: 8px 16px 0; }
 
-.sky-detail { padding: 0 24px; display: flex; flex-direction: column; gap: 10px; }
-.sky-row { display: flex; gap: 16px; align-items: baseline; justify-content: space-between; }
-.sky-row__label { font-size: 12px; color: var(--md-on-surface-variant); flex: none; }
-.sky-row__value {
+.detail-section {
+  margin: 20px 24px 8px; font-size: 12px; font-weight: 500; letter-spacing: .5px;
+  text-transform: uppercase; color: var(--md-primary);
+}
+.detail-rows { padding: 0 24px; display: flex; flex-direction: column; gap: 8px; }
+.detail-row { display: flex; gap: 16px; align-items: baseline; justify-content: space-between; }
+.detail-row__label { font-size: 12px; color: var(--md-on-surface-variant); flex: none; }
+.detail-row__value {
   font-size: 14px; text-align: right; font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
+
+.info-box {
+  margin: 16px 24px 0; padding: 16px;
+  background: var(--md-surface-container-high); border-radius: var(--shape-m);
+  display: flex; flex-direction: column; gap: 14px;
+}
+.info-item { display: flex; gap: 12px; align-items: flex-start; }
+.info-item .ms { font-size: 20px; color: var(--md-primary); flex: none; margin-top: 1px; }
+.info-item p { margin: 0; font-size: 13px; line-height: 19px; color: var(--md-on-surface-variant); }
+.info-item strong { color: var(--md-on-surface); font-weight: 500; }
 
 .empty-state {
   text-align: center; padding: 40px 24px; color: var(--md-on-surface-variant);

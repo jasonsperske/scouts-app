@@ -2,19 +2,21 @@
 
 /* accuracyKm / surfaceKm are MEASURED against JPL Horizons (DE441) over
    2026-2029: the worst distance error of the model, and the worst placement
-   error of a point on the body's surface. They are shown in the app so nobody
-   mistakes a millimetre readout for millimetre truth. */
+   error of a point on the body's surface. flatteningKm is equatorial minus
+   polar radius — the error we accept by treating each body as a sphere.
+   All three are shown in the app so nobody mistakes a millimetre readout for
+   millimetre truth. */
 export const BODIES = {
-  sun:     { id: 'sun',     name: 'The Sun',  kind: 'star',   radiusKm: 695700,  icon: 'light_mode', accuracyKm: 8e3 },
-  mercury: { id: 'mercury', name: 'Mercury',  kind: 'planet', radiusKm: 2439.7,  icon: 'planet', accuracyKm: 11e3, surfaceKm: 0.2 },
-  venus:   { id: 'venus',   name: 'Venus',    kind: 'planet', radiusKm: 6051.8,  icon: 'planet', accuracyKm: 23e3, surfaceKm: 1 },
-  moon:    { id: 'moon',    name: 'The Moon', kind: 'moon',   radiusKm: 1737.4,  icon: 'dark_mode', accuracyKm: 25, surfaceKm: 6 },
-  mars:    { id: 'mars',    name: 'Mars',     kind: 'planet', radiusKm: 3396.19, icon: 'planet', accuracyKm: 35e3, surfaceKm: 0.5 },
-  jupiter: { id: 'jupiter', name: 'Jupiter',  kind: 'planet', radiusKm: 71492,   icon: 'planet', accuracyKm: 420e3, surfaceKm: 10 },
-  saturn:  { id: 'saturn',  name: 'Saturn',   kind: 'planet', radiusKm: 60268,   icon: 'planet', accuracyKm: 1.2e6, surfaceKm: 100 },
-  uranus:  { id: 'uranus',  name: 'Uranus',   kind: 'planet', radiusKm: 25559,   icon: 'planet', accuracyKm: 1e6, surfaceKm: 10 },
-  neptune: { id: 'neptune', name: 'Neptune',  kind: 'planet', radiusKm: 24764,   icon: 'planet', accuracyKm: 330e3, surfaceKm: 5 },
-  pluto:   { id: 'pluto',   name: 'Pluto',    kind: 'planet', radiusKm: 1188.3,  icon: 'planet', accuracyKm: 620e3, surfaceKm: 0.2 },
+  sun:     { id: 'sun',     name: 'The Sun',  kind: 'star',   radiusKm: 695700,  icon: 'light_mode', accuracyKm: 8e3, surfaceKm: 0, flatteningKm: 7 },
+  mercury: { id: 'mercury', name: 'Mercury',  kind: 'planet', radiusKm: 2439.7,  icon: 'planet', accuracyKm: 11e3, surfaceKm: 0.2, flatteningKm: 2.3 },
+  venus:   { id: 'venus',   name: 'Venus',    kind: 'planet', radiusKm: 6051.8,  icon: 'planet', accuracyKm: 23e3, surfaceKm: 1, flatteningKm: 0 },
+  moon:    { id: 'moon',    name: 'The Moon', kind: 'moon',   radiusKm: 1737.4,  icon: 'dark_mode', accuracyKm: 12, surfaceKm: 6, flatteningKm: 0 },
+  mars:    { id: 'mars',    name: 'Mars',     kind: 'planet', radiusKm: 3396.19, icon: 'planet', accuracyKm: 35e3, surfaceKm: 0.5, flatteningKm: 20 },
+  jupiter: { id: 'jupiter', name: 'Jupiter',  kind: 'planet', radiusKm: 71492,   icon: 'planet', accuracyKm: 420e3, surfaceKm: 10, flatteningKm: 4638 },
+  saturn:  { id: 'saturn',  name: 'Saturn',   kind: 'planet', radiusKm: 60268,   icon: 'planet', accuracyKm: 1.2e6, surfaceKm: 100, flatteningKm: 5904 },
+  uranus:  { id: 'uranus',  name: 'Uranus',   kind: 'planet', radiusKm: 25559,   icon: 'planet', accuracyKm: 1e6, surfaceKm: 10, flatteningKm: 586 },
+  neptune: { id: 'neptune', name: 'Neptune',  kind: 'planet', radiusKm: 24764,   icon: 'planet', accuracyKm: 330e3, surfaceKm: 5, flatteningKm: 423 },
+  pluto:   { id: 'pluto',   name: 'Pluto',    kind: 'planet', radiusKm: 1188.3,  icon: 'planet', accuracyKm: 620e3, surfaceKm: 0.2, flatteningKm: 0 },
 };
 
 /* Planetocentric latitude and EAST longitude, IAU body-fixed frames. */

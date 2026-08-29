@@ -29,6 +29,12 @@ GitHub Pages.
 - **Zenith / nadir countdown** — every sky row shows its altitude and a countdown to
   its next meridian crossing: to the **zenith** while it is still climbing, to the
   **nadir** once it has started to fall.
+- **Tap any row for the caveats** — a detail sheet with what the number is made of
+  (range rate, light delay, alt/az, sub-observer point, bearing) and an honest error
+  budget: how far off it could be, what share of the distance that is, the same error
+  expressed in your own units (±0.09 Moons, ±872 Disneylands), and a plain-language
+  list of every reason — ephemeris model, rotation model, your GPS fix, your clock,
+  and the physics deliberately left out.
 - Material 3 styling, light and dark, safe-area aware, keyboard and screen-reader paths.
 
 ## How the distances are computed
@@ -67,6 +73,9 @@ Moon every 29 hours). Worst-case distance error over that span:
 | Venus | 22,400 km | Neptune | 330,000 km |
 | Mars | 34,800 km | Pluto | 615,000 km |
 
+The Moon figure is the worst of 3,505 samples at 5-hour steps across 2026–2027
+(RMS 3 km); the app quotes a slightly conservative ±12 km.
+
 Surface-feature placement was checked against Horizons' sub-observer longitude and
 latitude: within 0.006° for Mercury, Mars, Jupiter, Neptune and Pluto, 0.01° for
 Venus, and 0.18° for the Moon (≈ 6 km on its surface, the IAU_MOON vs MOON_ME frame
@@ -74,7 +83,7 @@ difference plus the truncated libration series). Meridian-crossing times were ch
 by confirming the solver lands on hour angle 0 or 12 h at a true altitude extremum,
 over 96 cases across four targets.
 
-Each sky row shows its own error bar — tap it. So yes, you can watch a planet's
+Each row shows its own error bar — tap it. So yes, you can watch a planet's
 distance tick over in millimetres, and the app will tell you the last eleven digits
 are decoration. Other caveats: your clock is assumed correct (the Moon moves ~1 km/s),
 UT1−UTC is ignored (< 0.9 s), nutation is left out (< 0.6 km), bodies are treated as
