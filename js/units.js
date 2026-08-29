@@ -36,7 +36,7 @@ function superscript(exponent) {
 
 function formatNumber(value) {
   const abs = Math.abs(value);
-  if (abs !== 0 && (abs >= 1e9 || abs < 1e-3)) {
+  if (abs !== 0 && (abs >= 1e15 || abs < 1e-3)) {
     const [mantissa, exponent] = value.toExponential(2).split('e');
     return `${mantissa} × 10${superscript(exponent)}`;
   }

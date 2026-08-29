@@ -281,6 +281,30 @@ main {
 .place__distance small { display: block; font-size: 11px; font-weight: 400; color: var(--md-on-surface-variant); }
 .place--reference .place__distance small { color: inherit; opacity: .8; }
 
+.place__telemetry {
+  font-size: 12px; line-height: 16px; margin-top: 1px;
+  color: var(--md-primary); font-variant-numeric: tabular-nums;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.place--reference .place__telemetry { color: inherit; }
+
+.place--sky .place__avatar { background: var(--md-tertiary-container); color: var(--md-on-tertiary-container); }
+.place--sky.place--reference .place__avatar { background: var(--md-primary); color: var(--md-on-primary); }
+.place--sky { cursor: pointer; }
+.place__distance--long { font-size: 12px; letter-spacing: -0.2px; }
+.place__distance--long small { font-size: 10px; }
+
+.sheet__title--strong { font-size: 22px; font-weight: 400; color: var(--md-on-surface); margin-bottom: 12px; }
+.sheet__actions { display: flex; justify-content: flex-end; padding: 8px 16px 0; }
+
+.sky-detail { padding: 0 24px; display: flex; flex-direction: column; gap: 10px; }
+.sky-row { display: flex; gap: 16px; align-items: baseline; justify-content: space-between; }
+.sky-row__label { font-size: 12px; color: var(--md-on-surface-variant); flex: none; }
+.sky-row__value {
+  font-size: 14px; text-align: right; font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
 .empty-state {
   text-align: center; padding: 40px 24px; color: var(--md-on-surface-variant);
 }

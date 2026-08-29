@@ -45,7 +45,7 @@
         </button>
       </span>
     </div>
-    <div class="search-support" id="searchSupport">Try “Eiffel Tower”, “Disneyland”, or paste <code>lat, lon</code></div>
+    <div class="search-support" id="searchSupport">Try “Eiffel Tower”, “Olympus Mons”, or paste <code>lat, lon</code></div>
     <ul id="results" class="results" role="listbox" aria-label="Search results" hidden></ul>
   </section>
 
@@ -57,7 +57,10 @@
     <span class="ms" aria-hidden="true">location_off</span>
     <p>No places yet. Search above, or tap <strong>Save here</strong> to pin where you are.</p>
   </div>
-  <p class="attribution">Search by <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> / Nominatim</p>
+  <p class="attribution">
+    Earth search by <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> / Nominatim.
+    Sky positions from Keplerian and IAU models, checked against JPL Horizons — tap a planet for its error bars.
+  </p>
 </main>
 
 <button id="fab" class="fab" type="button">
@@ -79,6 +82,16 @@
   <div class="sheet__handle" aria-hidden="true"></div>
   <h2 class="sheet__title">Show distances in…</h2>
   <ul class="unit-list" id="unitList"></ul>
+</dialog>
+
+<!-- Sky detail sheet -->
+<dialog id="skySheet" class="sheet" aria-labelledby="skySheetTitle">
+  <div class="sheet__handle" aria-hidden="true"></div>
+  <h2 class="sheet__title sheet__title--strong" id="skySheetTitle">Body</h2>
+  <div class="sky-detail" id="skyBody"></div>
+  <div class="sheet__actions">
+    <button class="button button--text" type="button" data-close>Close</button>
+  </div>
 </dialog>
 
 <!-- Name / rename dialog -->
