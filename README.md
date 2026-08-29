@@ -18,6 +18,7 @@ GitHub Pages.
   Moon, and named surface features: the Sea of Tranquillity, Olympus Mons, Tycho,
   Gale and Jezero craters, Caloris Planitia, Maxwell Montes, the Apollo 11 site.
 - **Ranked by closeness** — nearest first; the app-bar arrow flips it.
+- **Real geodesics on Earth** — WGS84 ellipsoid distances, not spherical approximations.
 - **Human units by default** — distances auto-scale mm → cm → m → km → AU → light years.
 - **Pick a unit** — tap the label at the bottom for mm, cm, m, km, inches, feet,
   yards, miles, AU or light years.
@@ -39,8 +40,10 @@ GitHub Pages.
 
 ## How the distances are computed
 
-Terrestrial places use a great-circle (haversine) distance — the number you expect
-when you ask how far away Paris is. Celestial places use real 3D geometry:
+Places on Earth use the **WGS84 geodesic** — the true shortest path across the
+ellipsoid GPS itself reports against, solved with Vincenty's inverse method. The
+great-circle-on-a-sphere shortcut that most apps use is off by up to half a percent:
+22 km on Los Angeles to Paris. Celestial places use real 3D geometry:
 
 - **You** are placed on the WGS84 ellipsoid from your latitude, longitude and
   altitude, then carried around by the Earth's rotation via Greenwich mean sidereal
@@ -75,6 +78,18 @@ Moon every 29 hours). Worst-case distance error over that span:
 
 The Moon figure is the worst of 3,505 samples at 5-hour steps across 2026–2027
 (RMS 3 km); the app quotes a slightly conservative ±12 km.
+
+Earth-side distances were checked against **GeographicLib** (Karney) over 469 point
+pairs — 400 random, 60 deliberately near-antipodal, plus equatorial, polar, meridional,
+coincident and sub-metre cases. Worst error on the 467 that solve: **0.07 mm**.
+
+Vincenty's iteration famously oscillates instead of converging for nearly antipodal
+points, so it retries with progressively shorter steps, which settles on the same root
+without overshooting; that recovers every near-antipodal case tested. What remains is
+the true degeneracy — points antipodal to within a whisker, where the shortest path is
+not unique because every route over a pole is the same length. Those return half the
+meridional circumference, which is exact for a true antipode and within ~25 km around
+it, and the app says so on the row.
 
 Surface-feature placement was checked against Horizons' sub-observer longitude and
 latitude: within 0.006° for Mercury, Mars, Jupiter, Neptune and Pluto, 0.01° for
@@ -116,7 +131,7 @@ index.html          markup, sheets and dialogs
 css/styles.css      Material 3 tokens and components
 js/app.js           state, rendering, the live clock, wiring
 js/db.js            IndexedDB store + settings
-js/geo.js           haversine, geolocation, Nominatim
+js/geo.js           WGS84 geodesic (Vincenty), geolocation, Nominatim
 js/units.js         unit table, human-unit ladder, formatting
 js/drag.js          pointer drag from a row onto the unit bar
 js/astro/

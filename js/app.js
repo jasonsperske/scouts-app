@@ -3,7 +3,8 @@
 
 import { allPlaces, putPlace, removePlace, newId, loadSettings, saveSettings } from './db.js';
 import { UNITS, UNIT_BY_ID, formatDistance, modeLabel, unitExample } from './units.js';
-import { distanceMetres, currentPosition, searchPlaces, describePoint, formatCoords } from './geo.js';
+import { distanceMetres, surfaceDistance, greatCircleMetres, currentPosition, searchPlaces,
+  describePoint, formatCoords } from './geo.js';
 import { initDragToTarget } from './drag.js';
 import { BODIES, searchCelestial } from './astro/catalog.js';
 import { rangeMetres, look, observe, nextCulmination, subEarthPoint } from './astro/index.js';
@@ -83,11 +84,24 @@ function site() {
   return state.origin && { lat: state.origin.lat, lon: state.origin.lon, height: state.origin.height || 0 };
 }
 
+/* A geodesic to a fixed point only changes when the observer moves, and the
+   near-antipodal solve is not free, so remember them. */
+const groundCache = new Map();
+const clearGroundCache = () => groundCache.clear();
+
+function groundDistance(place) {
+  const cached = groundCache.get(place.id);
+  if (cached) return cached;
+  const solved = surfaceDistance(state.origin, place);
+  groundCache.set(place.id, solved);
+  return solved;
+}
+
 /** Distance from the observer to a place, in metres. NaN when we have no fix. */
 function placeMetres(place, when = state.now) {
   if (!state.origin) return NaN;
   if (isSky(place)) return rangeMetres(place, site(), when);
-  return distanceMetres(state.origin, place);
+  return groundDistance(place).metres;
 }
 
 function currentMode() {
@@ -355,6 +369,7 @@ async function locate() {
     const pos = await currentPosition();
     state.origin = { ...pos, height: pos.altitude || 0, source: 'gps' };
     state.settings.manualOrigin = null;
+    clearGroundCache();
     persist();
     state.locating = false;
     render();
@@ -370,6 +385,7 @@ async function locate() {
 function setManualOrigin(point) {
   state.origin = { lat: point.lat, lon: point.lon, height: 0, source: 'manual', label: point.name };
   state.originError = null;
+  clearGroundCache();
   state.settings.manualOrigin = { lat: point.lat, lon: point.lon, label: point.name };
   persist();
   state.culminations.clear();
@@ -547,6 +563,7 @@ async function saveCurrentLocation() {
       state.origin = point;
       state.originError = null;
       state.settings.manualOrigin = null;
+      clearGroundCache();
       persist();
       render();
     }
@@ -776,7 +793,9 @@ function measurementRows(place) {
       { label: 'Distance', live: () => showDistance(place) },
       { label: 'Coordinates', value: `${place.lat.toFixed(5)}, ${place.lon.toFixed(5)}` },
       { label: 'Direction', live: located(() => bearingTo(place)) },
-      { label: 'Measured as', value: 'Great-circle arc over the surface' },
+      { label: 'Measured as', live: located(() => groundDistance(place).method === 'antipodal'
+        ? 'Antipodal — see below'
+        : 'WGS84 geodesic (Vincenty)') },
     ];
   }
 
@@ -878,27 +897,44 @@ function errorBudget(place) {
         + '0.9 s, so under 0.5 km of Earth rotation). Both are far below the model error above.',
     });
   } else {
-    const distance = placeMetres(place);
-    const sphere = isFinite(distance) ? distance * 0.005 : 0;
-    metres += sphere;
-    reasons.push({
-      icon: 'public',
-      title: 'The Earth is not a sphere',
-      text: 'Distances to places on Earth are great-circle arcs on a sphere of mean radius. The '
-        + 'true distance across the WGS84 ellipsoid differs by up to about 0.5%'
-        + (isFinite(distance) ? ` — roughly ${km(sphere / 1000)} at this range.` : '.'),
-    });
+    const solved = state.origin ? groundDistance(place) : null;
+
+    if (solved && solved.method === 'antipodal') {
+      metres += 25000;
+      reasons.push({
+        icon: 'public',
+        title: 'You picked your antipode',
+        text: 'This place is almost exactly opposite you on the Earth, where the shortest path '
+          + 'is not unique — every route over a pole is the same length — and the usual solution '
+          + 'has nothing to converge on. The figure shown is half the meridional circumference: '
+          + 'exact for a true antipode, within about 25 km either side of it.',
+      });
+    } else if (solved) {
+      metres += 0.0001;                 // the solver's own agreement with GeographicLib
+      const sphere = greatCircleMetres(state.origin, place);
+      const difference = Math.abs(solved.metres - sphere);
+      reasons.push({
+        icon: 'public',
+        title: 'Measured across the ellipsoid',
+        text: 'This is a geodesic — the shortest path over the WGS84 ellipsoid, the same shape '
+          + 'GPS reports against — solved with Vincenty\u2019s method and checked against '
+          + `GeographicLib to under 0.1 mm. The great-circle-on-a-sphere shortcut would say `
+          + `${km(sphere / 1000)}, ${km(difference / 1000)} out.`,
+      });
+    }
+
     reasons.push({
       icon: 'place',
       title: 'Where the place is',
       text: 'A saved place is a single point. Search results mark a building entrance or an '
-        + 'administrative centroid, and a park, a city or a mountain can be kilometres across.',
+        + 'administrative centroid, and a park, a city or a mountain can be kilometres across. '
+        + 'That width is not in the figure above, because nothing here knows it.',
     });
     reasons.push({
       icon: 'landscape',
-      title: 'Flat as drawn',
-      text: 'Elevation is ignored — this is measured at sea level. It is also not travel '
-        + 'distance: no roads, no flights, no detours.',
+      title: 'Along the surface, at sea level',
+      text: 'Elevation is ignored: a route climbing to 1 km is about 0.016% longer than the same '
+        + 'route at sea level. It is also not travel distance — no roads, no flights, no detours.',
     });
   }
 
@@ -993,7 +1029,15 @@ function errorRows(place, budget) {
     const share = error / distance * 100;
     rows.push({
       label: 'Share of the distance',
-      value: share < 0.001 ? `${share.toExponential(1)}%` : `${share.toFixed(share < 1 ? 3 : 1)}%`,
+      value: share < 0.0001 ? 'under 0.0001%' : `${share.toFixed(share < 1 ? 4 : 1)}%`,
+    });
+  }
+  if (!isSky(place)) {
+    rows.push({
+      label: 'Not counted',
+      value: state.origin && state.origin.source !== 'gps'
+        ? 'how wide the place is, and where you actually are'
+        : 'how wide the place itself is',
     });
   }
 
@@ -1247,6 +1291,7 @@ async function boot() {
   if (state.settings.manualOrigin) {
     const saved = state.settings.manualOrigin;
     state.origin = { lat: saved.lat, lon: saved.lon, height: 0, source: 'manual', label: saved.label };
+    clearGroundCache();
     render();
   } else {
     locate();

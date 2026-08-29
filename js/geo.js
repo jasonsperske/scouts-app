@@ -1,17 +1,97 @@
 /* Geolocation, great-circle distance, and place lookup (OpenStreetMap / Nominatim). */
 
-const EARTH_RADIUS_M = 6371008.8; // IUGG mean radius
+const EARTH_RADIUS_M = 6371008.8;      // IUGG mean radius, for the fallback only
+
+/* WGS84 — the ellipsoid GPS itself reports against. */
+const WGS84_A = 6378137.0;
+const WGS84_F = 1 / 298.257223563;
+const WGS84_B = WGS84_A * (1 - WGS84_F);
+const ANTIPODAL_METRES = 20003931.5;   // half the meridional circumference
 
 const toRad = deg => deg * Math.PI / 180;
 
-/** Great-circle distance in metres between two {lat, lon} points. */
-export function distanceMetres(a, b) {
+/** Great-circle distance on a sphere of mean radius — kept for comparison. */
+export function greatCircleMetres(a, b) {
   const dLat = toRad(b.lat - a.lat);
   const dLon = toRad(b.lon - a.lon);
   const lat1 = toRad(a.lat);
   const lat2 = toRad(b.lat);
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
   return 2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+/**
+ * Distance across the WGS84 ellipsoid — Vincenty's inverse solution, accurate to
+ * well under a millimetre. It is the great-circle formula that is the crude one:
+ * a sphere of mean radius is off by up to half a percent, which is 45 km on a
+ * transatlantic hop.
+ *
+ * The iteration is known not to converge for very nearly antipodal points, so
+ * that case falls back to the sphere and says so.
+ * @returns {{metres:number, method:'geodesic'|'great-circle'}}
+ */
+export function surfaceDistance(a, b) {
+  const L = toRad(b.lon - a.lon);
+  const tanU1 = (1 - WGS84_F) * Math.tan(toRad(a.lat));
+  const cosU1 = 1 / Math.sqrt(1 + tanU1 * tanU1);
+  const sinU1 = tanU1 * cosU1;
+  const tanU2 = (1 - WGS84_F) * Math.tan(toRad(b.lat));
+  const cosU2 = 1 / Math.sqrt(1 + tanU2 * tanU2);
+  const sinU2 = tanU2 * cosU2;
+
+  /* The geometry that hangs off a trial λ (the longitude difference on the
+     auxiliary sphere). Vincenty's iteration is the fixed point of `next`. */
+  const evaluate = lambda => {
+    const sinLambda = Math.sin(lambda), cosLambda = Math.cos(lambda);
+    const sinSigma = Math.hypot(cosU2 * sinLambda, cosU1 * sinU2 - sinU1 * cosU2 * cosLambda);
+    const cosSigma = sinU1 * sinU2 + cosU1 * cosU2 * cosLambda;
+    const sigma = Math.atan2(sinSigma, cosSigma);
+    const sinAlpha = sinSigma === 0 ? 0 : cosU1 * cosU2 * sinLambda / sinSigma;
+    const cosSqAlpha = 1 - sinAlpha * sinAlpha;
+    // cosSqAlpha is 0 along the equator, where cos(2σm) is undefined.
+    const cos2SigmaM = cosSqAlpha === 0 ? 0 : cosSigma - 2 * sinU1 * sinU2 / cosSqAlpha;
+    const C = WGS84_F / 16 * cosSqAlpha * (4 + WGS84_F * (4 - 3 * cosSqAlpha));
+    const next = L + (1 - C) * WGS84_F * sinAlpha
+      * (sigma + C * sinSigma * (cos2SigmaM + C * cosSigma * (-1 + 2 * cos2SigmaM * cos2SigmaM)));
+    return { sinSigma, cosSigma, sigma, cosSqAlpha, cos2SigmaM, next };
+  };
+
+  const lengthOf = state => {
+    const uSq = state.cosSqAlpha * (WGS84_A * WGS84_A - WGS84_B * WGS84_B) / (WGS84_B * WGS84_B);
+    const A = 1 + uSq / 16384 * (4096 + uSq * (-768 + uSq * (320 - 175 * uSq)));
+    const B = uSq / 1024 * (256 + uSq * (-128 + uSq * (74 - 47 * uSq)));
+    const { sinSigma, cosSigma, cos2SigmaM, sigma } = state;
+    const deltaSigma = B * sinSigma * (cos2SigmaM + B / 4 * (
+      cosSigma * (-1 + 2 * cos2SigmaM * cos2SigmaM)
+      - B / 6 * cos2SigmaM * (-3 + 4 * sinSigma * sinSigma) * (-3 + 4 * cos2SigmaM * cos2SigmaM)
+    ));
+    return WGS84_B * A * (sigma - deltaSigma);
+  };
+
+  /* Vincenty's iteration is undamped (step = 1). For nearly antipodal points it
+     oscillates around the root instead of settling, so retry with progressively
+     shorter steps, which converges on the same root without overshooting. */
+  for (const [step, maxIterations] of [[1, 100], [0.5, 4000], [0.25, 8000], [0.1, 20000]]) {
+    let lambda = L;
+    for (let i = 0; i < maxIterations; i++) {
+      const state = evaluate(lambda);
+      if (state.sinSigma === 0) return { metres: 0, method: 'geodesic' };   // coincident
+      const delta = state.next - lambda;
+      if (Math.abs(delta) < 1e-12) return { metres: lengthOf(state), method: 'geodesic' };
+      lambda += step * delta;
+    }
+  }
+
+  /* Left over: points that are antipodal to within a whisker. There the shortest
+     path is not unique — every route over a pole is equally short — and Vincenty's
+     formulation cannot express it. Half the meridional circumference is the exact
+     answer for a true antipode, and within ~25 km for its neighbourhood. */
+  return { metres: ANTIPODAL_METRES, method: 'antipodal' };
+}
+
+/** Distance in metres between two {lat, lon} points on the Earth's surface. */
+export function distanceMetres(a, b) {
+  return surfaceDistance(a, b).metres;
 }
 
 export function currentPosition(options = {}) {
