@@ -207,6 +207,13 @@ this — the app shows a snackbar with a **Reload** button that performs the han
 and reloads once the new worker is actually in charge. Stale caches are deleted on
 activation.
 
+**Freshness.** Same-origin files are fetched network-first and fall back to the cache,
+so a deploy can never leave you running new HTML against old JavaScript — a failure
+mode that is miserable to diagnose from the outside. If the network has not answered
+in 2.5 seconds and there is a cached copy, that copy is served and the network updates
+it in the background. Only the Google Fonts files are cache-first, because their URLs
+are content-addressed and cannot go stale.
+
 **Changing what is cached.** Add the file to the `PRECACHE` array in `sw.js` and bump
 `VERSION`. The deploy workflow fails if the two ever drift apart, in either direction,
 and also if the Google Fonts URL in `sw.js` stops matching the one in `index.html`

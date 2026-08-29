@@ -7,7 +7,7 @@
    Those are left on the network deliberately: a stale geocode is worse than an
    honest failure. */
 
-const VERSION = 'scout-v1';
+const VERSION = 'scout-v2';
 const SHELL_CACHE = `${VERSION}-shell`;
 const FONT_CACHE = `${VERSION}-fonts`;
 
@@ -104,36 +104,56 @@ self.addEventListener('fetch', event => {
 
   const url = new URL(request.url);
 
-  if (request.mode === 'navigate') {
+  if (url.origin === self.location.origin) {
+    // Everything the app is built from goes through one strategy, so a page can
+    // never end up running its own HTML against someone else's JavaScript.
     event.respondWith(networkFirst(request));
     return;
   }
-  if (url.origin === self.location.origin) {
-    event.respondWith(cacheFirst(request, SHELL_CACHE));
-    return;
-  }
   if (FONT_HOSTS.has(url.hostname)) {
+    // Google serves fonts from content-addressed URLs, so a cached copy cannot
+    // go stale — only unused.
     event.respondWith(cacheFirst(request, FONT_CACHE));
     return;
   }
   // Nominatim and anything else: straight to the network, uncached.
 });
 
-/** For the page itself: fresh when possible, cached when not. */
+/* How long to wait for the network before falling back to a copy we already
+   have. Short, because the point of the cache is that a dead connection should
+   feel like an instant load rather than a stall. */
+const NETWORK_TIMEOUT_MS = 2500;
+
+/**
+ * Fresh when there is a network, cached when there is not.
+ *
+ * Cache-first would load faster, but it decouples the page from its own assets:
+ * a deploy would hand a returning visitor the new index.html and the previous
+ * app.js, which is a genuinely confusing thing to debug.
+ */
 async function networkFirst(request) {
   const cache = await caches.open(SHELL_CACHE);
-  try {
+  const key = request.mode === 'navigate' ? './index.html' : request;
+  const cached = (await cache.match(request)) || (await cache.match(key));
+
+  const network = (async () => {
     const response = await fetch(request);
-    if (response.ok) cache.put('./index.html', response.clone());
+    if (response.ok) await cache.put(key, response.clone());
     return response;
-  } catch {
-    return (await cache.match(request))
-      || (await cache.match('./index.html'))
-      || Response.error();
+  })();
+
+  if (!cached) {
+    return network.catch(() => Response.error());
   }
+
+  // A copy is already in hand, so give the network a moment and then stop
+  // waiting; it still finishes in the background and updates the cache.
+  const timeout = new Promise(resolve => setTimeout(() => resolve(null), NETWORK_TIMEOUT_MS));
+  const winner = await Promise.race([network.catch(() => null), timeout]);
+  return winner || cached;
 }
 
-/** For assets: serve from cache, then refresh it in the background. */
+/** For immutable, content-addressed URLs: serve the copy, refresh it quietly. */
 async function cacheFirst(request, cacheName) {
   const cache = await caches.open(cacheName);
   const cached = await cache.match(request);
@@ -144,6 +164,5 @@ async function cacheFirst(request, cacheName) {
   }).catch(() => null);
 
   if (cached) return cached;
-  const response = await network;
-  return response || Response.error();
+  return (await network) || Response.error();
 }
