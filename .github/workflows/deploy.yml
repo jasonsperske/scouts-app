@@ -3,11 +3,16 @@
 # One-time setup in the repository: Settings → Pages → Build and deployment →
 # Source → "GitHub Actions". No secrets or tokens to create; the permissions
 # below are all this needs.
+#
+# Pull requests run the checks but do not deploy: a branch should be able to fail
+# review without taking the live site with it.
 
 name: Deploy to GitHub Pages
 
 on:
   push:
+    branches: [main]
+  pull_request:
     branches: [main]
   workflow_dispatch:
 
@@ -15,12 +20,6 @@ permissions:
   contents: read
   pages: write
   id-token: write
-
-# Let a running deploy finish rather than cancelling it mid-publish, but never
-# queue more than one behind it.
-concurrency:
-  group: pages
-  cancel-in-progress: false
 
 jobs:
   check:
@@ -81,7 +80,14 @@ jobs:
   deploy:
     name: Deploy
     needs: check
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    # Let a running deploy finish rather than cancelling it mid-publish, but
+    # never queue more than one behind it. Scoped to this job so that checks on
+    # a pull request never wait behind a deploy.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
