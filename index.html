@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Nearabouts — places by distance</title>
+<meta name="description" content="Save places, search for new ones, and see how far away everything is — in any unit you like, including your own.">
+<meta name="theme-color" content="#fef7ff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#141218" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📍</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap">
+<link rel="stylesheet" href="./css/styles.css">
+</head>
+<body>
+
+<header class="app-bar">
+  <div class="app-bar__title">
+    <span class="ms app-bar__logo" aria-hidden="true">explore_nearby</span>
+    <h1>Nearabouts</h1>
+  </div>
+  <button id="sortBtn" class="icon-button" type="button" aria-pressed="false" title="Nearest first">
+    <span class="ms" id="sortIcon" aria-hidden="true">arrow_upward</span>
+    <span class="sr-only">Toggle sort direction</span>
+  </button>
+  <button id="locBtn" class="icon-button" type="button" title="Update my location">
+    <span class="ms" aria-hidden="true">my_location</span>
+    <span class="sr-only">Update my location</span>
+  </button>
+</header>
+
+<main>
+  <section class="search-section">
+    <div class="text-field">
+      <span class="ms text-field__leading" aria-hidden="true">search</span>
+      <input id="search" type="search" placeholder=" " autocomplete="off" autocapitalize="off"
+             spellcheck="false" aria-label="Search for a place" aria-controls="results" aria-expanded="false">
+      <label for="search">Search for a place</label>
+      <span class="text-field__trailing">
+        <span id="searchSpinner" class="spinner" hidden aria-hidden="true"></span>
+        <button id="clearSearch" class="icon-button icon-button--small" type="button" hidden>
+          <span class="ms" aria-hidden="true">close</span>
+          <span class="sr-only">Clear search</span>
+        </button>
+      </span>
+    </div>
+    <div class="search-support" id="searchSupport">Try “Eiffel Tower”, “Disneyland”, or paste <code>lat, lon</code></div>
+    <ul id="results" class="results" role="listbox" aria-label="Search results" hidden></ul>
+  </section>
+
+  <div id="banner" class="banner" hidden></div>
+
+  <h2 class="section-title" id="listTitle">Saved places</h2>
+  <ul id="places" class="list" aria-labelledby="listTitle"></ul>
+  <div id="emptyState" class="empty-state" hidden>
+    <span class="ms" aria-hidden="true">location_off</span>
+    <p>No places yet. Search above, or tap <strong>Save here</strong> to pin where you are.</p>
+  </div>
+  <p class="attribution">Search by <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> / Nominatim</p>
+</main>
+
+<button id="fab" class="fab" type="button">
+  <span class="ms" aria-hidden="true">add_location_alt</span>
+  <span class="fab__label">Save here</span>
+</button>
+
+<footer id="unitBar" class="unit-bar">
+  <button id="unitBtn" class="unit-chip" type="button" aria-haspopup="dialog">
+    <span class="ms" id="unitIcon" aria-hidden="true">straighten</span>
+    <span id="unitLabel">human units</span>
+    <span class="ms unit-chip__caret" aria-hidden="true">expand_less</span>
+  </button>
+  <span class="unit-bar__hint" id="unitHint">Drag a place here to measure in its units</span>
+</footer>
+
+<!-- Unit picker sheet -->
+<dialog id="unitSheet" class="sheet" aria-label="Choose units">
+  <div class="sheet__handle" aria-hidden="true"></div>
+  <h2 class="sheet__title">Show distances in…</h2>
+  <ul class="unit-list" id="unitList"></ul>
+</dialog>
+
+<!-- Name / rename dialog -->
+<dialog id="nameDialog" class="dialog" aria-labelledby="nameDialogTitle">
+  <form method="dialog" id="nameForm">
+    <h2 id="nameDialogTitle" class="dialog__title">Name this place</h2>
+    <div class="dialog__body">
+      <div class="text-field text-field--plain">
+        <input id="nameInput" type="text" placeholder=" " required maxlength="60" autocomplete="off">
+        <label for="nameInput">Name</label>
+      </div>
+      <p class="dialog__support" id="nameSupport"></p>
+    </div>
+    <div class="dialog__actions">
+      <button class="button button--text" type="button" data-close>Cancel</button>
+      <button class="button button--filled" type="submit" id="nameSubmit">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Confirm dialog -->
+<dialog id="confirmDialog" class="dialog" aria-labelledby="confirmTitle">
+  <h2 id="confirmTitle" class="dialog__title">Remove place?</h2>
+  <div class="dialog__body"><p class="dialog__support" id="confirmText"></p></div>
+  <div class="dialog__actions">
+    <button class="button button--text" type="button" data-close>Cancel</button>
+    <button class="button button--filled button--danger" type="button" id="confirmOk">Remove</button>
+  </div>
+</dialog>
+
+<!-- Row overflow menu -->
+<div id="menu" class="menu" role="menu" hidden></div>
+
+<div id="snackbar" class="snackbar" role="status" aria-live="polite" hidden></div>
+<div id="dragGhost" class="drag-ghost" hidden aria-hidden="true"></div>
+
+<script type="module" src="./js/app.js"></script>
+</body>
+</html>
