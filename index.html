@@ -62,8 +62,39 @@
   <h2 class="section-title" id="listTitle">Saved places</h2>
   <ul id="places" class="list" aria-labelledby="listTitle"></ul>
   <div id="emptyState" class="empty-state" hidden>
-    <span class="ms" aria-hidden="true">location_off</span>
-    <p>No places yet. Search above, or tap <strong>Save here</strong> to pin where you are.</p>
+    <span class="ms empty-state__mark" aria-hidden="true">explore</span>
+    <h3>Nothing saved yet</h3>
+    <p class="empty-state__lede">Save anything you can put a coordinate on. Scout keeps the
+      list sorted by how far away it is from you, right now.</p>
+
+    <ul class="empty-state__kinds">
+      <li>
+        <span class="ms" aria-hidden="true">location_on</span>
+        <p><strong>Places on Earth</strong> — an address, a landmark, a mountain, a pub.
+          Search for it above, or paste <code>lat, lon</code> straight into the box.
+          <strong>Save here</strong> pins wherever you happen to be standing.</p>
+      </li>
+      <li>
+        <span class="ms" aria-hidden="true">planet</span>
+        <p><strong>Planets, moons and the Sun</strong> — measured from your spot on a
+          turning Earth to the body's centre, so the number moves while you watch it.</p>
+      </li>
+      <li>
+        <span class="ms" aria-hidden="true">terrain</span>
+        <p><strong>Landmarks on other worlds</strong> — the Sea of Tranquillity, Olympus
+          Mons, Tycho crater, the Apollo 11 site. These swing towards and away from you as
+          their world rotates.</p>
+      </li>
+    </ul>
+
+    <p class="empty-state__try">Try searching for</p>
+    <div class="empty-state__examples" id="emptyExamples">
+      <button class="chip" type="button" data-example="Mars">Mars</button>
+      <button class="chip" type="button" data-example="Olympus Mons">Olympus Mons</button>
+      <button class="chip" type="button" data-example="Sea of Tranquillity">Sea of Tranquillity</button>
+      <button class="chip" type="button" data-example="Eiffel Tower">Eiffel Tower</button>
+      <button class="chip" type="button" data-example="Disneyland">Disneyland</button>
+    </div>
   </div>
   <p class="attribution">
     Earth search by <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> / Nominatim.

@@ -17,7 +17,8 @@ const el = {
   search: $('search'), searchSpinner: $('searchSpinner'), clearSearch: $('clearSearch'),
   results: $('results'),
   banner: $('banner'),
-  places: $('places'), emptyState: $('emptyState'),
+  places: $('places'), listTitle: $('listTitle'),
+  emptyState: $('emptyState'), emptyExamples: $('emptyExamples'),
   fab: $('fab'),
   unitBar: $('unitBar'), unitBtn: $('unitBtn'), unitLabel: $('unitLabel'),
   unitIcon: $('unitIcon'), unitHint: $('unitHint'),
@@ -36,8 +37,6 @@ const DEFAULT_SETTINGS = {
   refPlaceId: null,
   sortAsc: true,
   manualOrigin: null,
-  seeded: false,
-  seededSky: false,
 };
 
 const state = {
@@ -54,25 +53,6 @@ const state = {
   rows: new Map(),       // place id -> {li, distance, meta}
   culminations: new Map(),
 };
-
-const SEED_PLACES = [
-  { name: 'Disneyland',         detail: 'Anaheim, California', lat: 33.8121,  lon: -117.9190 },
-  { name: 'Statue of Liberty',  detail: 'New York, USA',       lat: 40.6892,  lon: -74.0445 },
-  { name: 'Eiffel Tower',       detail: 'Paris, France',       lat: 48.8584,  lon: 2.2945 },
-  { name: 'Mount Everest',      detail: 'Nepal / Tibet',       lat: 27.9881,  lon: 86.9250 },
-  { name: 'Sydney Opera House', detail: 'Sydney, Australia',   lat: -33.8568, lon: 151.2153 },
-];
-
-const SEED_SKY = [
-  { name: 'The Moon', detail: "Earth's moon · centre", body: 'moon' },
-  { name: 'Sea of Tranquillity', detail: 'Mare Tranquillitatis, the Moon', body: 'moon',
-    feature: { id: 'tranquillitatis', lat: 8.5, lon: 31.4 } },
-  { name: 'Mars', detail: 'Planet · centre', body: 'mars' },
-  { name: 'Olympus Mons', detail: 'Tharsis, Mars — 22 km tall', body: 'mars',
-    feature: { id: 'olympus', lat: 18.65, lon: 226.2 } },
-  { name: 'Jupiter', detail: 'Planet · centre', body: 'jupiter' },
-  { name: 'The Sun', detail: 'Star · centre', body: 'sun' },
-];
 
 /* ---------------------------------------------------------------- state */
 
@@ -190,7 +170,9 @@ function renderPlaces() {
   state.order = orderedIds();
   const byId = new Map(state.places.map(p => [p.id, p]));
   el.places.replaceChildren(...state.order.map(id => placeRow(byId.get(id))));
-  el.emptyState.hidden = state.places.length > 0;
+  const empty = state.places.length === 0;
+  el.emptyState.hidden = !empty;
+  el.listTitle.hidden = empty;
 }
 
 function placeRow(place) {
@@ -287,7 +269,9 @@ function renderUnitBar() {
   el.unitIcon.textContent = custom ? 'straighten' : (mode.kind === 'human' ? 'auto_awesome' : 'square_foot');
   el.unitHint.textContent = custom
     ? `1× = your distance to ${mode.name}. Tap to change.`
-    : 'Drag a place here to measure in its units';
+    : state.places.length
+      ? 'Drag a place here to measure in its units'
+      : 'Tap to change units';
 }
 
 function renderBanner() {
@@ -1224,6 +1208,18 @@ function wire() {
 
   el.unitBtn.addEventListener('click', openUnitSheet);
 
+  // The empty state's examples are a demonstration, not a shortcut: they fill the
+  // search box so you see where the results come from, rather than conjuring
+  // places into a list you did not ask for.
+  el.emptyExamples.addEventListener('click', event => {
+    const chip = event.target.closest('[data-example]');
+    if (!chip) return;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    el.search.value = chip.dataset.example;
+    el.search.focus();
+    onSearchInput();
+  });
+
   el.places.addEventListener('click', event => {
     const menuButton = event.target.closest('[data-menu]');
     if (menuButton) {
@@ -1322,33 +1318,12 @@ function offerUpdate(registration) {
 
 /* ---------------------------------------------------------------- boot */
 
-async function seedIfEmpty() {
-  if (!state.places.length && !state.settings.seeded) {
-    for (const seed of SEED_PLACES) {
-      const place = { id: newId(), ...seed, source: 'seed', createdAt: Date.now() };
-      await putPlace(place);
-      state.places.push(place);
-    }
-    state.settings.seeded = true;
-  }
-  if (!state.settings.seededSky) {
-    for (const seed of SEED_SKY) {
-      const place = { id: newId(), kind: 'sky', ...seed, source: 'seed', createdAt: Date.now() };
-      await putPlace(place);
-      state.places.push(place);
-    }
-    state.settings.seededSky = true;
-  }
-  persist();
-}
-
 async function boot() {
   wire();
   registerServiceWorker();
   render();
 
   state.places = await allPlaces();
-  await seedIfEmpty();
   render();
 
   if (state.settings.manualOrigin) {
