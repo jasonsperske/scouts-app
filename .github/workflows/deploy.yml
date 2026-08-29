@@ -72,6 +72,12 @@ jobs:
           done < <(find js -name '*.js')
           exit $status
 
+      - name: Parse the service worker
+        run: node --check sw.js
+
+      - name: Check the service worker precaches everything shipped
+        run: node .github/scripts/check-precache.cjs
+
   deploy:
     name: Deploy
     needs: check

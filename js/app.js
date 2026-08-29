@@ -1188,11 +1188,22 @@ function confirmAction(message) {
 }
 
 let toastTimer = null;
-function toast(message) {
-  el.snackbar.textContent = message;
+function toast(message, action) {
+  el.snackbar.replaceChildren(message);
+  if (action) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'snackbar__action';
+    button.textContent = action.label;
+    button.addEventListener('click', () => {
+      el.snackbar.hidden = true;
+      action.run();
+    });
+    el.snackbar.append(button);
+  }
   el.snackbar.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.snackbar.hidden = true; }, 3500);
+  toastTimer = setTimeout(() => { el.snackbar.hidden = true; }, action ? 15000 : 3500);
 }
 
 /* ---------------------------------------------------------------- wiring */
@@ -1258,6 +1269,57 @@ function wire() {
   });
 }
 
+/* ---------------------------------------------------------------- offline */
+
+/** The app is all arithmetic once loaded, so it may as well survive a tunnel. */
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  window.addEventListener('load', async () => {
+    try {
+      const registration = await navigator.serviceWorker.register('./sw.js', { scope: './' });
+      registration.addEventListener('updatefound', () => {
+        const incoming = registration.installing;
+        if (!incoming) return;
+        incoming.addEventListener('statechange', () => {
+          // A controller already exists, so this is an update rather than a
+          // first install. Don't swap the code out from under a running page:
+          // offer it, and let the reload happen when the new worker is in charge.
+          if (incoming.state === 'installed' && navigator.serviceWorker.controller) {
+            offerUpdate(registration);
+          }
+        });
+      });
+    } catch {
+      /* Offline support is a bonus, not a dependency. */
+    }
+  });
+}
+
+/**
+ * A worker that has installed sits in "waiting" until every tab controlled by the
+ * old one goes away — and an ordinary reload does not count, so the page has to
+ * ask for the handover and reload once it has actually happened.
+ */
+function offerUpdate(registration) {
+  toast('A new version of Scout is ready.', {
+    label: 'Reload',
+    run: () => {
+      const waiting = registration.waiting;
+      if (!waiting) {
+        location.reload();
+        return;
+      }
+      let reloading = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (reloading) return;      // controllerchange can fire more than once
+        reloading = true;
+        location.reload();
+      });
+      waiting.postMessage('skip-waiting');
+    },
+  });
+}
+
 /* ---------------------------------------------------------------- boot */
 
 async function seedIfEmpty() {
@@ -1282,6 +1344,7 @@ async function seedIfEmpty() {
 
 async function boot() {
   wire();
+  registerServiceWorker();
   render();
 
   state.places = await allPlaces();

@@ -19,6 +19,8 @@ GitHub Pages.
   Gale and Jezero craters, Caloris Planitia, Maxwell Montes, the Apollo 11 site.
 - **Ranked by closeness** — nearest first; the app-bar arrow flips it.
 - **Real geodesics on Earth** — WGS84 ellipsoid distances, not spherical approximations.
+- **Works offline** — installable to a home screen, and everything except searching for
+  new places keeps working with no connection.
 - **Human units by default** — distances auto-scale mm → cm → m → km → AU → light years.
 - **Pick a unit** — tap the label at the bottom for mm, cm, m, km, inches, feet,
   yards, miles, AU or light years.
@@ -176,8 +178,43 @@ Open the site in the phone's browser, then:
   square — without clipping the artwork.
 
 Either way it opens without browser chrome (`"display": "standalone"`), which is why
-it feels like an app rather than a bookmark. Everything still runs client-side; there
-is no service worker yet, so it needs a connection on first load and for place search.
+it feels like an app rather than a bookmark — and thanks to the service worker it
+opens with no connection at all. Chrome also offers a proper **Install** prompt now
+that there is a manifest and a fetch handler.
+
+### Offline
+
+`sw.js` precaches the whole app on first visit, so after that it runs with no network
+whatsoever. That is not a trick: once loaded, almost nothing here needs a server. Your
+places are in IndexedDB, the distances are arithmetic, and the planets come from
+series expansions running in your browser — Mars keeps ticking over in millimetres on
+a plane at 38,000 feet.
+
+| Works offline | Needs the network |
+|---|---|
+| The saved list, sorted, in every unit | Searching for a new place (Nominatim) |
+| Planets, moons and surface features | The name suggested by *Save here* |
+| Zenith / nadir countdowns, live distances | The very first visit |
+| Saving your current position (GPS is a device sensor, not a network call) | |
+
+Place search is deliberately never cached: a stale geocode that looks fresh is worse
+than an honest "could not reach the place search", which is what you get offline.
+
+**Updates.** A new deploy is picked up on the next visit and installs quietly in the
+background. Because a waiting worker cannot take over while a tab is still controlled
+by the old one — reloading is *not* enough, a detail that bites most first attempts at
+this — the app shows a snackbar with a **Reload** button that performs the handover
+and reloads once the new worker is actually in charge. Stale caches are deleted on
+activation.
+
+**Changing what is cached.** Add the file to the `PRECACHE` array in `sw.js` and bump
+`VERSION`. The deploy workflow fails if the two ever drift apart, in either direction,
+and also if the Google Fonts URL in `sw.js` stops matching the one in `index.html`
+(the fonts are fetched at install time, so the icon font is there on a first offline
+launch rather than only after a second visit).
+
+**During development**, an old worker can serve you stale files. Chrome DevTools →
+**Application** → **Service Workers** → *Update on reload*, or *Unregister*.
 
 ### The icon
 
@@ -210,7 +247,10 @@ all a circular launcher mask will show.
 ```
 .github/workflows/
   deploy.yml        checks the sources, then publishes to GitHub Pages
+.github/scripts/
+  check-precache.cjs  fails the build if sw.js and the repo drift apart
 index.html          markup, sheets and dialogs
+sw.js               service worker: precaching, offline, update handover
 site.webmanifest    name, colours and icons for installing to a home screen
 icons/              icon sources, generated PNGs, and build.sh to regenerate them
 css/styles.css      Material 3 tokens and components

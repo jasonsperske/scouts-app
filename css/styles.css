@@ -424,6 +424,14 @@ dialog::backdrop { background: rgb(0 0 0 / .4); }
   font-size: 14px; line-height: 20px; animation: snack-in .2s ease-out;
 }
 @keyframes snack-in { from { opacity: 0; transform: translate(-50%, 8px); } }
+.snackbar { display: flex; align-items: center; gap: 8px; }
+.snackbar__action {
+  flex: none; margin: -6px -8px -6px 8px; padding: 6px 12px;
+  border: 0; border-radius: var(--shape-xs); background: transparent;
+  color: var(--md-primary); font-family: var(--font); font-size: 14px; font-weight: 500;
+  cursor: pointer;
+}
+.snackbar__action:hover { background: color-mix(in srgb, var(--md-inverse-on-surface) 12%, transparent); }
 
 /* ---------------- Drag ghost ---------------- */
 .drag-ghost {
