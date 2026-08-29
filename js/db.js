@@ -1,6 +1,6 @@
 /* IndexedDB storage for saved places. */
 
-const DB_NAME = 'nearabouts';
+const DB_NAME = 'scout';
 const DB_VERSION = 1;
 const STORE = 'places';
 
@@ -57,7 +57,7 @@ export function getPlace(id) {
 
 /* Small key/value settings live in localStorage — they are per-device UI prefs,
    not user data worth an object store. */
-const SETTINGS_KEY = 'nearabouts:settings';
+const SETTINGS_KEY = 'scout:settings';
 
 export function loadSettings(defaults) {
   try {

@@ -1,0 +1,93 @@
+# Publishes the site to GitHub Pages on every push to main.
+#
+# One-time setup in the repository: Settings → Pages → Build and deployment →
+# Source → "GitHub Actions". No secrets or tokens to create; the permissions
+# below are all this needs.
+
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let a running deploy finish rather than cancelling it mid-publish, but never
+# queue more than one behind it.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Check sources
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Parse every ES module
+        run: |
+          status=0
+          while IFS= read -r file; do
+            if node --input-type=module --check < "$file"; then
+              echo "ok    $file"
+            else
+              echo "FAIL  $file"
+              status=1
+            fi
+          done < <(find js -name '*.js' | sort)
+          exit $status
+
+      - name: Check that referenced files exist
+        run: |
+          status=0
+          # src="..." and href="..." attributes pointing at local files
+          while IFS= read -r ref; do
+            path="${ref#./}"
+            if [ ! -f "$path" ]; then
+              echo "MISSING  $path (referenced by index.html)"
+              status=1
+            else
+              echo "ok       $path"
+            fi
+          done < <(grep -oE '(src|href)="\./[^"]+"' index.html | sed -E 's/.*="([^"]+)"/\1/')
+          # relative imports between modules
+          while IFS= read -r file; do
+            dir=$(dirname "$file")
+            while IFS= read -r spec; do
+              target="$dir/$spec"
+              if [ ! -f "$target" ]; then
+                echo "MISSING  $target (imported by $file)"
+                status=1
+              fi
+            done < <(grep -oE "from '\./[^']+'" "$file" | sed -E "s/from '(.*)'/\1/")
+          done < <(find js -name '*.js')
+          exit $status
+
+  deploy:
+    name: Deploy
+    needs: check
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/configure-pages@v5
+
+      # The repository root is the site: no build step, no bundler, no install.
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

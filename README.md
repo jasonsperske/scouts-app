@@ -1,4 +1,4 @@
-# Nearabouts
+# Scout
 
 A single-page app that keeps a list of places — some down the road, some on other
 planets — and shows how far each one is from you right now, sorted by distance,
@@ -118,15 +118,56 @@ Geolocation requires a secure context — `localhost` counts, as does any HTTPS 
 Without a fix you can still use the app: search for a place and tap the
 person-pin icon to measure from there.
 
-## Deploying to GitHub Pages
+## Publishing to GitHub Pages
 
-The repository root *is* the site. Push, then in **Settings → Pages** choose
-*Deploy from a branch* → `main` / `/ (root)`. The `.nojekyll` file keeps Pages from
-touching the assets.
+The repository root *is* the site — no build step, no bundler, nothing to install —
+and `.github/workflows/deploy.yml` publishes it on every push to `main`.
+
+**One-time setup, once the repository is on GitHub:**
+
+1. Open **Settings → Pages**.
+2. Under **Build and deployment**, set **Source** to **GitHub Actions**.
+3. Push to `main` (or run the workflow by hand from the **Actions** tab →
+   *Deploy to GitHub Pages* → **Run workflow**).
+
+That is the whole setup. There are no secrets or tokens to create: the workflow
+requests the `pages: write` and `id-token: write` permissions it needs in its own
+file, and GitHub issues the credentials for the duration of the run.
+
+The site lands at `https://<your-username>.github.io/<repository-name>/`, or at
+`https://<your-username>.github.io/` if the repository is named
+`<your-username>.github.io`. The **Actions** tab shows each run, and the finished
+deploy links to the live URL.
+
+**What the workflow does**
+
+| Job | Step |
+|---|---|
+| `check` | Parses every ES module with Node, so a syntax error never reaches the site |
+| `check` | Verifies every file `index.html` references and every module import resolves |
+| `deploy` | Uploads the repository root and publishes it — only if `check` passed |
+
+Deploys are serialised (`concurrency: pages`), and a run in flight is allowed to
+finish rather than being cancelled halfway through publishing.
+
+**Worth knowing**
+
+- Pages serves over HTTPS, which the browser requires before it will hand out your
+  location. The app works on `localhost` for the same reason.
+- Nothing is stored server-side: saved places live in your own browser's IndexedDB,
+  so each visitor gets their own list, and clearing site data clears it.
+- The app calls OpenStreetMap's Nominatim from the browser. That is fine for personal
+  use; a busy site should run its own instance or another geocoder — one file,
+  `js/geo.js`.
+- Deploying from a branch instead works too (**Settings → Pages → Deploy from a
+  branch** → `main` / `/ (root)`); the included `.nojekyll` keeps Jekyll's hands off
+  the assets. The Actions workflow is the better route, since it runs the checks.
 
 ## Layout
 
 ```
+.github/workflows/
+  deploy.yml        checks the sources, then publishes to GitHub Pages
 index.html          markup, sheets and dialogs
 css/styles.css      Material 3 tokens and components
 js/app.js           state, rendering, the live clock, wiring

@@ -1,4 +1,4 @@
-/* Nearabouts — a static SPA that ranks places by how far they are from you,
+/* Scout — a static SPA that ranks places by how far they are from you,
    whether they are down the road or on another planet. */
 
 import { allPlaces, putPlace, removePlace, newId, loadSettings, saveSettings } from './db.js';
